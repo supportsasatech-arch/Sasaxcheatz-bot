@@ -15,6 +15,7 @@ const orderStates = {};
 
 async function getMenuFromApp() {
     try {
+
         const response = await fetch(`${FIREBASE_URL}/dishes.json`);
         const data = await response.json();
 
@@ -28,6 +29,7 @@ async function getMenuFromApp() {
         }));
 
     } catch (error) {
+
         console.error("❌ Failed to fetch menu:", error);
         return [];
     }
@@ -40,9 +42,11 @@ async function startBot() {
         process.exit(1);
     }
 
-    const { state, saveCreds } = await useMultiFileAuthState('session_data');
+    const { state, saveCreds } =
+        await useMultiFileAuthState('session_data');
 
-    const { version } = await fetchLatestBaileysVersion();
+    const { version } =
+        await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
         version,
@@ -52,30 +56,48 @@ async function startBot() {
         browser: ["SasaXCheatZ", "Chrome", "1.0.0"]
     });
 
-    // 🔑 PAIRING CODE LOGIN
-    if (!state.creds.registered) {
-
-        const phoneNumber = "94784167385"; // Replace with your WhatsApp number
-
-        const code = await sock.requestPairingCode(phoneNumber);
-
-        console.log("\n=================================");
-        console.log("🔑 YOUR PAIRING CODE:");
-        console.log(code);
-        console.log("=================================\n");
-    }
-
+    // 🔄 CONNECTION UPDATE
     sock.ev.on('connection.update', async (update) => {
 
         const { connection, lastDisconnect } = update;
 
+        // 🔑 PAIRING CODE
+        if (connection === 'connecting' &&
+            !state.creds.registered) {
+
+            const phoneNumber = "94784167385"; // Replace with your number
+
+            setTimeout(async () => {
+
+                try {
+
+                    const code =
+                        await sock.requestPairingCode(phoneNumber);
+
+                    console.log("\n=================================");
+                    console.log("🔑 YOUR PAIRING CODE:");
+                    console.log(code);
+                    console.log("=================================\n");
+
+                } catch (err) {
+
+                    console.log("❌ Pairing Error:", err.message);
+                }
+
+            }, 5000);
+        }
+
+        // ✅ CONNECTED
         if (connection === 'open') {
+
             console.log("✅ BOT CONNECTED SUCCESSFULLY!");
         }
 
+        // ❌ DISCONNECTED
         if (connection === 'close') {
 
-            const reason = lastDisconnect?.error?.output?.statusCode;
+            const reason =
+                lastDisconnect?.error?.output?.statusCode;
 
             console.log("❌ Connection Closed:", reason);
 
@@ -85,8 +107,10 @@ async function startBot() {
         }
     });
 
+    // 💾 SAVE SESSION
     sock.ev.on('creds.update', saveCreds);
 
+    // 📩 MESSAGE LISTENER
     sock.ev.on('messages.upsert', async (m) => {
 
         const msg = m.messages[0];
@@ -111,16 +135,20 @@ async function startBot() {
             const menu = await getMenuFromApp();
 
             if (!menu.length) {
+
                 await sock.sendMessage(sender, {
                     text: "❌ Menu Not Available"
                 });
+
                 return;
             }
 
-            let menuText = "👾 *PANEL MENU LIST * 👾\n\n";
+            let menuText = "👾 *PANEL MENU LIST* 👾\n\n";
 
             menu.forEach((item, index) => {
-                menuText += `${index + 1}. ${item.name} - Rs.${item.price}\n`;
+
+                menuText +=
+                    `${index + 1}. ${item.name} - Rs.${item.price}\n`;
             });
 
             await sock.sendMessage(sender, {
