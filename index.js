@@ -14,7 +14,7 @@ const FIREBASE_URL = process.env.FIREBASE_URL;
 // 🛒 ORDER STATES
 const orderStates = {};
 
-// 🍔 FETCH MENU FROM FIREBASE
+// 🍔 FETCH MENU
 async function getMenuFromApp() {
 
     try {
@@ -45,7 +45,6 @@ async function getMenuFromApp() {
 // 🚀 START BOT
 async function startBot() {
 
-    // ❌ FIREBASE CHECK
     if (!FIREBASE_URL) {
 
         console.log("❌ FIREBASE_URL Missing!");
@@ -56,7 +55,7 @@ async function startBot() {
     const { state, saveCreds } =
         await useMultiFileAuthState('./session');
 
-    // 📦 BAILEYS VERSION
+    // 📦 VERSION
     const { version } =
         await fetchLatestBaileysVersion();
 
@@ -64,49 +63,52 @@ async function startBot() {
     const sock = makeWASocket({
         version,
         auth: state,
-        logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
+        logger: pino({ level: 'silent' }),
         browser: ['SasaXCheatZ', 'Chrome', '1.0.0']
     });
 
     // 💾 SAVE SESSION
     sock.ev.on('creds.update', saveCreds);
 
-    // 🔄 CONNECTION EVENTS
-    sock.ev.on('connection.update', async (update) => {
+    // 🔑 PAIRING CODE
+    if (!state.creds.registered) {
 
-        const {
-            connection,
-            qr,
-            lastDisconnect
-        } = update;
-
-        console.log("📡 Connection Status:", connection);
-
-        // 🔑 GENERATE PAIRING CODE
-        if (qr && !state.creds.registered) {
+        setTimeout(async () => {
 
             try {
 
                 const code =
-                    await sock.requestPairingCode('94784167385');
+                    await sock.requestPairingCode("94784167385");
 
-                console.log('\n=================================');
-                console.log('🔑 YOUR PAIRING CODE');
+                console.log("\n==============================");
+                console.log("🔑 PAIRING CODE:");
                 console.log(code);
-                console.log('=================================\n');
+                console.log("==============================\n");
 
             } catch (err) {
 
-                console.log('❌ Pairing Error');
-                console.log(err);
+                console.log("❌ Pairing Error:");
+                console.log(err.message);
             }
-        }
+
+        }, 15000);
+    }
+
+    // 🔄 CONNECTION UPDATE
+    sock.ev.on('connection.update', async (update) => {
+
+        const {
+            connection,
+            lastDisconnect
+        } = update;
+
+        console.log("📡 Status:", connection);
 
         // ✅ CONNECTED
         if (connection === 'open') {
 
-            console.log('✅ BOT CONNECTED SUCCESSFULLY!');
+            console.log("✅ BOT CONNECTED SUCCESSFULLY!");
         }
 
         // ❌ DISCONNECTED
@@ -115,11 +117,11 @@ async function startBot() {
             const reason =
                 lastDisconnect?.error?.output?.statusCode;
 
-            console.log('❌ Connection Closed:', reason);
+            console.log("❌ Connection Closed:", reason);
 
             if (reason !== DisconnectReason.loggedOut) {
 
-                console.log('🔄 Reconnecting...');
+                console.log("🔄 Reconnecting...");
                 startBot();
             }
         }
