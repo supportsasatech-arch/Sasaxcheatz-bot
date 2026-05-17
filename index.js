@@ -2,8 +2,7 @@ const {
     default: makeWASocket,
     useMultiFileAuthState,
     DisconnectReason,
-    fetchLatestBaileysVersion,
-    delay
+    fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
 
 const pino = require('pino');
@@ -70,38 +69,37 @@ async function startBot() {
         browser: ['SasaXCheatZ', 'Chrome', '1.0.0']
     });
 
+    // 💾 SAVE SESSION
+    sock.ev.on('creds.update', saveCreds);
+
     // 🔄 CONNECTION EVENTS
     sock.ev.on('connection.update', async (update) => {
 
-        const { connection, lastDisconnect } = update;
+        const {
+            connection,
+            qr,
+            lastDisconnect
+        } = update;
 
         console.log("📡 Connection Status:", connection);
 
-        // 🔑 PAIRING CODE
-        if (connection === 'connecting') {
+        // 🔑 GENERATE PAIRING CODE
+        if (qr && !state.creds.registered) {
 
-            if (!sock.authState.creds.registered) {
+            try {
 
-                try {
+                const code =
+                    await sock.requestPairingCode('94784167385');
 
-                    // Wait for socket ready
-                    await delay(10000);
+                console.log('\n=================================');
+                console.log('🔑 YOUR PAIRING CODE');
+                console.log(code);
+                console.log('=================================\n');
 
-                    const phoneNumber = '94784167385';
+            } catch (err) {
 
-                    const code =
-                        await sock.requestPairingCode(phoneNumber);
-
-                    console.log('\n=================================');
-                    console.log('🔑 YOUR PAIRING CODE');
-                    console.log(code);
-                    console.log('=================================\n');
-
-                } catch (err) {
-
-                    console.log('❌ Pairing Error');
-                    console.log(err);
-                }
+                console.log('❌ Pairing Error');
+                console.log(err);
             }
         }
 
@@ -127,9 +125,6 @@ async function startBot() {
         }
     });
 
-    // 💾 SAVE SESSION
-    sock.ev.on('creds.update', saveCreds);
-
     // 📩 MESSAGE LISTENER
     sock.ev.on('messages.upsert', async (m) => {
 
@@ -148,6 +143,20 @@ async function startBot() {
         ).toLowerCase();
 
         console.log(`📩 Message: ${text}`);
+
+        // 👋 AUTO REPLY
+        if (text === "hi" || text === "hello") {
+
+            await sock.sendMessage(sender, {
+                text:
+`👋 Hello!
+
+Type:
+🍔 menu
+
+To view available items.`
+            });
+        }
 
         // 🍔 MENU COMMAND
         if (text === "menu") {
@@ -168,25 +177,12 @@ async function startBot() {
             menu.forEach((item, index) => {
 
                 menuText +=
-                    `${index + 1}. ${item.name} - Rs.${item.price}\n`;
+`${index + 1}. ${item.name} - Rs.${item.price}
+`;
             });
 
             await sock.sendMessage(sender, {
                 text: menuText
-            });
-        }
-
-        // 👋 AUTO REPLY
-        if (text === "hi" || text === "hello") {
-
-            await sock.sendMessage(sender, {
-                text:
-`👋 Hello!
-
-Type:
-🍔 menu
-
-To view available items.`
             });
         }
     });
